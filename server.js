@@ -2,6 +2,8 @@ import express from 'express';
 import connectDatabase from './config/db';
 import {check, validationResult } from 'express-validator';
 import cors from 'cors';
+import bcrypt from 'bcryptjs';
+import Guitar from './models/Guitar';
 
 //initialize express 
 const app = express();
@@ -27,19 +29,42 @@ app.get('/', (req, res) =>
 
 //@route POST api/guitars
 //@desc Register Guitar
-app.post('/api/guitars', 
+app.post(
+    '/api/guitars', 
     [
         check('model', 'Please enter model name').not().isEmpty(),
         check('finish', 'Please enter finish type').not().isEmpty(),
         check('brand', 'Please enter guitar brand').not().isEmpty(),
         check('value', 'Please enter a dollar amount for value').not().isEmpty()
     ],
-    (req, res) => {
+    async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(422).json({ errors: errors.array() });
         } else {
-            res.send(req.body);
+            const { model, finish, brand, value } = req.body;
+            try {
+                let guitar = await Guitar.findOne({ model: model});
+                if (guitar) {
+                    return res
+                        .status(400)
+                        .json({ errors: [{ msg: 'Guitar already exists'}] });
+                }
+
+                //make new guitar entry
+                guitar = new Guitar({
+                    model: model,
+                    finish: finish,
+                    brand: brand,
+                    value: value
+                });
+
+                //save to db and return
+                await guitar.save();
+                res.send('Guitar successfully added to collection');
+            } catch (error) {
+                res.status(500).send('Server error');
+            }
         }        
     }
 );
